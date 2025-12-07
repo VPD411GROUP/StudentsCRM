@@ -96,4 +96,50 @@ public class StudentsRepository(StudentsDbContext db)
     }
 
     #endregion
+
+    #region Оценки
+    public async Task AddGradeAsync(Grade grade)
+    {
+        await _db.Grades.AddAsync(grade);
+        await _db.SaveChangesAsync();
+    }
+
+    #endregion
+
+    #region Связи
+
+    public async Task EnrollStudentInCourseAsync(int studentId, int courseId)
+    {
+        var student = await _db.Students
+                        .Include(s => s.Courses)
+                        .FirstOrDefaultAsync(s => s.Id == studentId);
+
+        var course = await _db.Courses.FirstOrDefaultAsync(courseId);
+
+        if (student is not null && course is not null)
+        {
+            student.Courses.Add(course);
+            await _db.SaveChangesAsync();
+        }
+    }
+
+    public async Task<List<Student>> GetStudentsWithCoursesAsync()
+    {
+        return await _db.Students
+                    .AsNoTracking()
+                    .Include(s => s.Courses)
+                    .Include(s => s.Grades)
+                    .OrderBy(s => s.LastName)
+                    .ToListAsync();
+    }
+
+    public async Task<List<Course>> GetCoursesWithStudentsAsync()
+    {
+        return await _db.Courses
+                    .Include(c => c.Students)
+                    .OrderBy(c => c.Name)
+                    .ToListAsync();
+    }
+    #endregion
 }
+
