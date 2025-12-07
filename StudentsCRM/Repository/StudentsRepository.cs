@@ -11,7 +11,7 @@ namespace StudentsCRM.Repository;
 // Update - Обновить
 // Delete - Удалить
 
-public class StudentsRepository(StudentsDbContext db)
+public class StudentsRepository(StudentsDbContext db) : IStudentsRepository
 {
     private readonly StudentsDbContext _db = db;
 
@@ -114,7 +114,7 @@ public class StudentsRepository(StudentsDbContext db)
                         .Include(s => s.Courses)
                         .FirstOrDefaultAsync(s => s.Id == studentId);
 
-        var course = await _db.Courses.FirstOrDefaultAsync(courseId);
+        var course = await _db.Courses.FirstOrDefaultAsync(c => c.Id == courseId);
 
         if (student is not null && course is not null)
         {
@@ -123,7 +123,7 @@ public class StudentsRepository(StudentsDbContext db)
         }
     }
 
-    public async Task<List<Student>> GetStudentsWithCoursesAsync()
+    public async Task<List<Student>> GetStudentsWithDetailsAsync()
     {
         return await _db.Students
                     .AsNoTracking()
@@ -136,6 +136,7 @@ public class StudentsRepository(StudentsDbContext db)
     public async Task<List<Course>> GetCoursesWithStudentsAsync()
     {
         return await _db.Courses
+                    .AsNoTracking()
                     .Include(c => c.Students)
                     .OrderBy(c => c.Name)
                     .ToListAsync();

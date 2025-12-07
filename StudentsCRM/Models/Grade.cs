@@ -9,5 +9,5 @@ public class Grade
 
     // Внешние ключи
     public int StudentId { get; set; }
-    public required Student Student { get; set; }
+    public Student? Student { get; set; }
 }
