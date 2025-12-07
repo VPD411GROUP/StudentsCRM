@@ -1,6 +1,7 @@
-﻿using Microsoft.Data.SqlClient;
-using StudentsCRM.Interfaces;
+﻿using StudentsCRM.Data;
 using StudentsCRM.Models;
+using Microsoft.EntityFrameworkCore;
+using StudentsCRM.Interfaces;
 
 namespace StudentsCRM.Repository;
 
@@ -10,126 +11,89 @@ namespace StudentsCRM.Repository;
 // Update - Обновить
 // Delete - Удалить
 
-public class StudentsRepository(string connectionString) : IRepository
+public class StudentsRepository(StudentsDbContext db)
 {
-    private readonly string _connectionString = connectionString;
+    private readonly StudentsDbContext _db = db;
 
-    // Метод для получения всех студентов
-    public List<Student> GetAll()
+    #region Студенты
+    public async Task<List<Student>> GetAllStudentsAsync()
     {
-        // Создаем новый лист (копию)
-        var students = new List<Student>();
+        return await _db.Students
+            .AsNoTracking()
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
+            .ToListAsync();
+    }
 
-        // Открываем соединение
-        using SqlConnection connection = new SqlConnection(_connectionString);
-        connection.Open();
+    public async Task<Student?> GetStudentByIdAsync(int id)
+    {
+        return await _db.Students
+            .AsNoTracking()
+            .Include(s => s.Grades)
+            .Include(s => s.Courses)
+            .FirstOrDefaultAsync(s => s.Id == id);
+    }
 
-        // Задаем запрос
-        var query = "SELECT * FROM Students";
+    public async Task AddStudentAsync(Student student)
+    {
+        await _db.Students.AddAsync(student);
+        await _db.SaveChangesAsync();
+    }
 
-        // Создаем команду
-        using var command = new SqlCommand(query, connection);
+    public async Task UpdateStudentAsync(Student student)
+    {
+        _db.Students.Update(student);
+        await _db.SaveChangesAsync();
+    }
 
-        // Запускаем "читалку"
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+    public async Task DeleteStudentByIdAsync(int id)
+    {
+        var student = await GetStudentByIdAsync(id);
+        if (student != null)
         {
-            var student = new Student
-            {
-                Id = reader.GetInt32(0),
-                FirstName = reader.GetString(1),
-                LastName = reader.GetString(2),
-                BirthDate = reader.GetDateTime(3),
-                Email = reader.GetString(4),
-            };
-
-            // Добавляем нового студента
-            students.Add(student);
+            _db.Students.Remove(student);
+            await _db.SaveChangesAsync();
         }
+    }
+    #endregion
 
-        // Возвращаем лист
-        return students;
+    #region Курсы
+    public async Task<List<Course>> GetAllCoursesAsync()
+    {
+        return await _db.Courses
+            .AsNoTracking()
+            .OrderBy(c => c.Name)
+            .ToListAsync();
     }
 
-    public Student? GetById(int id)
+    public async Task<Course?> GetCourseByIdAsync(int id)
     {
-        // Открываем соединение
-        using var connection = new SqlConnection(_connectionString);
-        connection.Open();
+        return await _db.Courses
+            .Include(c => c.Students)
+            .FirstOrDefaultAsync(c => c.Id == id);
+    }
 
-        // Пишем запрос
-        var query = "SELECT Id, FirstName, LastName, BirthDate, Email FROM Students WHERE Id = @id";
+    public async Task AddCourseAsync(Course course)
+    {
+        await _db.Courses.AddAsync(course);
+        await _db.SaveChangesAsync();
+    }
 
-        // Задаем команду
-        using var command = new SqlCommand(query, connection);
-        command.Parameters.AddWithValue("@id", id); // Задаем параметр
+    public async Task UpdateCourseAsync(Course course)
+    {
+        _db.Courses.Update(course);
+        await _db.SaveChangesAsync();
+    }
 
-        // Читаем данные
-        using var reader = command.ExecuteReader();
-
-        // Если "читалка" запустилась, возвращаем нового студента
-        if (reader.Read())
+    public async Task DeleteCourseByIdAsync(int id)
+    {
+        var course = await GetCourseByIdAsync(id);
+        if (course != null)
         {
-            return new Student()
-            {
-                Id = reader.GetInt32(0),
-                FirstName = reader.GetString(1),
-                LastName = reader.GetString(2),
-                BirthDate = reader.GetDateTime(3),
-                Email = reader.GetString(4),
-            };
+            _db.Courses.Remove(course);
+            await _db.SaveChangesAsync();
         }
-
-        // Если студент не найден, возвращаем null
-        return null;
     }
 
-    public void Add(string firstName, string lastName, DateTime birthDate, string email)
-    {
-        using SqlConnection connection = new SqlConnection(_connectionString);
-        connection.Open();
-
-        var query = "INSERT INTO Students (FirstName, LastName, BirthDate, Email) VALUES" +
-            "(@firstName, @lastName, @birthDate, @email)";
-
-        using var command = new SqlCommand(query, connection);
-        command.Parameters.AddWithValue("@firstName", firstName);
-        command.Parameters.AddWithValue("@lastName", lastName);
-        command.Parameters.AddWithValue("@birthDate", birthDate);
-        command.Parameters.AddWithValue("@email", email);
-
-        command.ExecuteNonQuery();
-    }
-
-    public void Update(int id, string firstName, string lastName, DateTime birthDate, string email)
-    {
-        using SqlConnection connection = new SqlConnection(_connectionString);
-        connection.Open();
-
-        var query = "UPDATE Students SET FirstName = @firstName, LastName = @lastName, BirthDate = @birthDate, Email = @email " +
-            "WHERE Id = @id";
-
-        using var command = new SqlCommand(query, connection);
-
-        command.Parameters.AddWithValue("@id", id);
-        command.Parameters.AddWithValue("@firstName", firstName);
-        command.Parameters.AddWithValue("@lastName", lastName);
-        command.Parameters.AddWithValue("@BirthDate", birthDate);
-        command.Parameters.AddWithValue("@email", email);
-
-        command.ExecuteNonQuery();
-
-    }
-
-    public void Delete(int id)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        connection.Open();
-
-        var query = "DELETE FROM Students WHERE Id = @id";
-
-        using var command = new SqlCommand(query, connection);
-        command.Parameters.AddWithValue("@id", id);
-        command.ExecuteNonQuery();
-    }
+    #endregion
 }
